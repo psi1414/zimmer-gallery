@@ -231,18 +231,37 @@ function openModal(photo) {
     modalImg.src = photo.path;
     modal.style.display = 'block';
     
-    EXIF.getData(modalImg, function() {
-        displayExifData(this);
-    });
+    // Create new image element for EXIF reading
+    const exifImg = new Image();
+    exifImg.crossOrigin = "anonymous";
+    
+    exifImg.onload = function() {
+        extractExifData(this, photo);
+    };
+    
+    exifImg.onerror = function() {
+        displayBasicData(photo);
+    };
+    
+    exifImg.src = photo.path + '?t=' + Date.now(); // Cache bust
 }
 
-function displayExifData(img) {
-    const exifData = EXIF.getAllTags(img);
-    const photoForThisModal = currentPhoto; // Capture current photo reference
-    
+function extractExifData(img, photo) {
+    try {
+        EXIF.getData(img, function() {
+            const exifData = EXIF.getAllTags(this);
+            displayPhotoData(photo, exifData);
+        });
+    } catch (error) {
+        console.error('EXIF error:', error);
+        displayBasicData(photo);
+    }
+}
+
+function displayPhotoData(photo, exifData) {
     exifInfo.innerHTML = '';
     
-    const title = photoTitles[photoForThisModal.filename] || photoForThisModal.name;
+    const title = photoTitles[photo.filename] || photo.name;
     
     const fields = {
         'Title': title,
@@ -251,13 +270,34 @@ function displayExifData(img) {
         'ISO': exifData.ISOSpeedRatings || 'N/A',
         'Shutter Speed': exifData.ExposureTime ? `1/${Math.round(1/exifData.ExposureTime)}s` : 'N/A',
         'Focal Length': exifData.FocalLength ? `${exifData.FocalLength}mm` : 'N/A',
-        'Date Taken': exifData.DateTime || new Date(photoForThisModal.lastModified).toLocaleString(),
-        'Image Width': exifData.PixelXDimension || 'N/A',
-        'Image Height': exifData.PixelYDimension || 'N/A',
-        'File Size': `${(photoForThisModal.size / 1024 / 1024).toFixed(2)} MB`
+        'Date Taken': exifData.DateTime || new Date(photo.lastModified).toLocaleString(),
+        'White Balance': exifData.WhiteBalance === 0 ? 'Auto' : (exifData.WhiteBalance === 1 ? 'Manual' : 'N/A'),
+        'Dimensions': exifData.PixelXDimension && exifData.PixelYDimension ? 
+            `${exifData.PixelXDimension} x ${exifData.PixelYDimension}` : 'N/A',
+        'File Size': `${(photo.size / 1024 / 1024).toFixed(2)} MB`
     };
     
     Object.entries(fields).forEach(([key, value]) => {
+        const item = document.createElement('div');
+        item.className = 'exif-item';
+        item.innerHTML = `<strong>${key}:</strong> ${value}`;
+        exifInfo.appendChild(item);
+    });
+}
+
+function displayBasicData(photo) {
+    exifInfo.innerHTML = '';
+    
+    const title = photoTitles[photo.filename] || photo.name;
+    
+    const basicFields = {
+        'Title': title,
+        'Filename': photo.name,
+        'File Size': `${(photo.size / 1024 / 1024).toFixed(2)} MB`,
+        'Date Modified': new Date(photo.lastModified).toLocaleString()
+    };
+    
+    Object.entries(basicFields).forEach(([key, value]) => {
         const item = document.createElement('div');
         item.className = 'exif-item';
         item.innerHTML = `<strong>${key}:</strong> ${value}`;
