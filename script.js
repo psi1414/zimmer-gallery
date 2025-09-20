@@ -65,6 +65,7 @@ async function verifyPassword() {
             isAdmin = true;
             await loadTitles();
             loadPhotos();
+            loadPhotoList();
         } else {
             showPasswordError();
         }
@@ -74,6 +75,37 @@ async function verifyPassword() {
     }
 }
 
+function loadPhotoList() {
+    const photoList = document.getElementById('photo-list');
+    photoList.innerHTML = '';
+    
+    photos.forEach(photo => {
+        const photoItem = document.createElement('div');
+        photoItem.className = 'photo-item';
+        
+        const thumbnail = document.createElement('img');
+        thumbnail.src = photo.path;
+        thumbnail.className = 'photo-thumbnail';
+        
+        const titleInput = document.createElement('input');
+        titleInput.className = 'title-edit';
+        titleInput.value = photoTitles[photo.filename] || photo.name;
+        
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = 'Save';
+        saveBtn.className = 'save-title-btn';
+        
+        saveBtn.addEventListener('click', async () => {
+            await saveTitle(photo.filename, titleInput.value);
+            loadPhotos(); // Refresh gallery
+        });
+        
+        photoItem.appendChild(thumbnail);
+        photoItem.appendChild(titleInput);
+        photoItem.appendChild(saveBtn);
+        photoList.appendChild(photoItem);
+    });
+}
 function showPasswordError() {
     adminPassword.style.border = '2px solid #dc3545';
     adminPassword.value = '';
