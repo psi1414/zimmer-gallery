@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Gallery</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.js"></script>
+</head>
+<body>
+    <header>
+        <h1>📸 Photo Gallery</h1>
+        <div id="admin-btn" class="admin-btn">⚙️</div>
+    </header>
+    
+    <div id="admin-panel" class="admin-panel">
+        <div class="admin-content">
+            <span class="close-admin">&times;</span>
+            <h3>Admin Panel</h3>
+            <input type="password" id="admin-password" placeholder="Enter password">
+            <button id="login-btn">Login</button>
+            
+            <div id="upload-section" style="display: none;">
+                <input type="file" id="upload" accept="image/*" multiple>
+                <label for="upload" class="upload-btn">Upload Photos</label>
+            </div>
+        </div>
+    </div>
+    
+    <div id="gallery" class="gallery"></div>
+    
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <img id="modal-img" src="" alt="">
+            <div class="exif-data">
+                <h3>Photo Details</h3>
+                <div id="exif-info"></div>
+                <button id="download-btn" class="download-btn">⬇️ Download</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
