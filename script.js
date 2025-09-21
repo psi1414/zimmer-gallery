@@ -1,128 +1,43 @@
-const upload = document.getElementById('upload');
-const gallery = document.getElementById('gallery');
-const modal = document.getElementById('modal');
-const modalImg = document.getElementById('modal-img');
-const exifInfo = document.getElementById('exif-info');
-const downloadBtn = document.getElementById('download-btn');
-const closeModal = document.querySelector('.close');
-
-const adminBtn = document.getElementById('admin-btn');
-const adminPanel = document.getElementById('admin-panel');
-const adminPassword = document.getElementById('admin-password');
-const loginBtn = document.getElementById('login-btn');
-const uploadSection = document.getElementById('upload-section');
-const closeAdmin = document.querySelector('.close-admin');
+const elements = {
+    upload: document.getElementById('upload'),
+    gallery: document.getElementById('gallery'),
+    modal: document.getElementById('modal'),
+    modalImg: document.getElementById('modal-img'),
+    exifInfo: document.getElementById('exif-info'),
+    downloadBtn: document.getElementById('download-btn'),
+    closeModal: document.querySelector('.close'),
+    adminBtn: document.getElementById('admin-btn'),
+    adminPanel: document.getElementById('admin-panel'),
+    adminPassword: document.getElementById('admin-password'),
+    loginBtn: document.getElementById('login-btn'),
+    uploadSection: document.getElementById('upload-section'),
+    closeAdmin: document.querySelector('.close-admin')
+};
 
 let photos = [];
 let currentPhoto = null;
 let isAdmin = false;
-let photoTitles = {};
 
 // Initialize
 loadPhotos();
-loadTitles();
 
-// Admin controls
-adminBtn.addEventListener('click', () => {
-    adminPanel.style.display = 'block';
-    setTimeout(() => adminPassword.focus(), 100);
+// Event listeners
+elements.adminBtn.addEventListener('click', () => {
+    elements.adminPanel.style.display = 'block';
+    setTimeout(() => elements.adminPassword.focus(), 100);
 });
 
-closeAdmin.addEventListener('click', closeAdminPanel);
-
-adminPanel.addEventListener('click', (e) => {
-    if (e.target === adminPanel) closeAdminPanel();
+elements.closeAdmin.addEventListener('click', closeAdminPanel);
+elements.adminPanel.addEventListener('click', (e) => {
+    if (e.target === elements.adminPanel) closeAdminPanel();
 });
 
-loginBtn.addEventListener('click', verifyPassword);
-
-adminPassword.addEventListener('keypress', (e) => {
+elements.loginBtn.addEventListener('click', verifyPassword);
+elements.adminPassword.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') verifyPassword();
 });
 
-async function loadTitles() {
-    try {
-        const response = await fetch('/api/titles');
-        photoTitles = await response.json();
-    } catch (error) {
-        console.error('Error loading titles:', error);
-    }
-}
-
-async function verifyPassword() {
-    try {
-        const response = await fetch('/api/verify-password', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: adminPassword.value })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            uploadSection.style.display = 'block';
-            adminPassword.style.border = '2px solid #28a745';
-            isAdmin = true;
-            await loadTitles();
-            loadPhotos();
-            loadPhotoList();
-        } else {
-            showPasswordError();
-        }
-    } catch (error) {
-        console.error('Auth error:', error);
-        showPasswordError();
-    }
-}
-
-function loadPhotoList() {
-    const photoList = document.getElementById('photo-list');
-    photoList.innerHTML = '';
-    
-    photos.forEach(photo => {
-        const photoItem = document.createElement('div');
-        photoItem.className = 'photo-item';
-        
-        const thumbnail = document.createElement('img');
-        thumbnail.src = photo.path;
-        thumbnail.className = 'photo-thumbnail';
-        
-        const titleInput = document.createElement('input');
-        titleInput.className = 'title-edit';
-        titleInput.value = photoTitles[photo.filename] || photo.name;
-        
-        const saveBtn = document.createElement('button');
-        saveBtn.textContent = 'Save';
-        saveBtn.className = 'save-title-btn';
-        
-        saveBtn.addEventListener('click', async () => {
-            await saveTitle(photo.filename, titleInput.value);
-            loadPhotos(); // Refresh gallery
-        });
-        
-        photoItem.appendChild(thumbnail);
-        photoItem.appendChild(titleInput);
-        photoItem.appendChild(saveBtn);
-        photoList.appendChild(photoItem);
-    });
-}
-function showPasswordError() {
-    adminPassword.style.border = '2px solid #dc3545';
-    adminPassword.value = '';
-    setTimeout(() => {
-        adminPassword.style.border = '2px solid #ddd';
-    }, 2000);
-}
-
-function closeAdminPanel() {
-    adminPanel.style.display = 'none';
-    adminPassword.value = '';
-    uploadSection.style.display = 'none';
-    adminPassword.style.border = '2px solid #ddd';
-}
-
-// Upload handler
-upload.addEventListener('change', async function(e) {
+elements.upload.addEventListener('change', async (e) => {
     const files = Array.from(e.target.files);
     const formData = new FormData();
     
@@ -133,30 +48,135 @@ upload.addEventListener('change', async function(e) {
     });
     
     try {
-        const response = await fetch('/api/upload', {
+        await fetch('/api/upload', {
             method: 'POST',
             body: formData
         });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            loadPhotos();
-            closeAdminPanel();
-        }
+        loadPhotos();
     } catch (error) {
         console.error('Upload error:', error);
     }
 });
 
-// Photo loading
+elements.closeModal.addEventListener('click', () => {
+    elements.modal.style.display = 'none';
+});
+
+elements.modal.addEventListener('click', (e) => {
+    if (e.target === elements.modal) {
+        elements.modal.style.display = 'none';
+    }
+});
+
+elements.downloadBtn.addEventListener('click', async () => {
+    if (!currentPhoto) return;
+    
+    try {
+        elements.downloadBtn.disabled = true;
+        elements.downloadBtn.textContent = 'Downloading...';
+        
+        const response = await fetch(`/download/${currentPhoto.filename}`);
+        
+        if (response.status === 429) {
+            const data = await response.json();
+            elements.downloadBtn.textContent = `Wait ${data.waitTime}s`;
+            setTimeout(() => {
+                elements.downloadBtn.disabled = false;
+                elements.downloadBtn.textContent = '⬇️ Download';
+            }, data.waitTime * 1000);
+            return;
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = currentPhoto.name;
+        link.click();
+        window.URL.revokeObjectURL(url);
+        
+        // Cooldown countdown
+        for (let i = 10; i >= 1; i--) {
+            elements.downloadBtn.textContent = `Cooldown (${i}s)`;
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        elements.downloadBtn.disabled = false;
+        elements.downloadBtn.textContent = '⬇️ Download';
+        
+    } catch (error) {
+        console.error('Download error:', error);
+        elements.downloadBtn.disabled = false;
+        elements.downloadBtn.textContent = '⬇️ Download';
+    }
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        if (elements.modal.style.display === 'block') {
+            elements.modal.style.display = 'none';
+        }
+        if (elements.adminPanel.style.display === 'block') {
+            closeAdminPanel();
+        }
+    }
+});
+
+// Functions
+async function verifyPassword() {
+    try {
+        const response = await fetch('/api/verify-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: elements.adminPassword.value })
+        });
+        
+        if (response.status === 429) {
+            const data = await response.json();
+            elements.adminPassword.style.border = '2px solid #dc3545';
+            alert(`IP banned for ${data.banTimeLeft} minutes`);
+            return;
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            elements.uploadSection.style.display = 'block';
+            elements.adminPassword.style.border = '2px solid #28a745';
+            isAdmin = true;
+            elements.adminPassword.style.display = 'none';
+            elements.loginBtn.style.display = 'none';
+        } else {
+            showPasswordError();
+        }
+    } catch (error) {
+        console.error('Auth error:', error);
+        showPasswordError();
+    }
+}
+
+function showPasswordError() {
+    elements.adminPassword.style.border = '2px solid #dc3545';
+    elements.adminPassword.value = '';
+    setTimeout(() => {
+        elements.adminPassword.style.border = '2px solid #ddd';
+    }, 2000);
+}
+
+function closeAdminPanel() {
+    elements.adminPanel.style.display = 'none';
+    elements.adminPassword.value = '';
+    elements.uploadSection.style.display = 'none';
+    elements.adminPassword.style.border = '2px solid #ddd';
+}
+
 async function loadPhotos() {
     try {
         const response = await fetch('/api/photos');
         const data = await response.json();
         photos = data.photos || [];
         
-        gallery.innerHTML = '';
+        elements.gallery.innerHTML = '';
         photos.forEach(photo => createPhotoCard(photo));
     } catch (error) {
         console.error('Error loading photos:', error);
@@ -171,99 +191,25 @@ function createPhotoCard(photo) {
     img.src = photo.path;
     img.alt = photo.name;
     
-    const info = document.createElement('div');
-    info.className = 'photo-info';
-    
-    const title = photoTitles[photo.filename] || photo.name;
-    
-    if (isAdmin) {
-        const titleInput = document.createElement('input');
-        titleInput.className = 'edit-title';
-        titleInput.value = title;
-        titleInput.readOnly = true;
-        
-        titleInput.addEventListener('click', (e) => {
-            e.stopPropagation();
-            editTitle(titleInput, photo.filename);
-        });
-        info.appendChild(titleInput);
-    } else {
-        const fileName = document.createElement('h4');
-        fileName.textContent = title;
-        info.appendChild(fileName);
-    }
-    
-    const fileSize = document.createElement('p');
-    fileSize.textContent = `Size: ${(photo.size / 1024 / 1024).toFixed(2)} MB`;
-    
-    info.appendChild(fileSize);
-    card.appendChild(img);
-    card.appendChild(info);
-    
-    card.addEventListener('click', () => openModal(photo));
-    gallery.appendChild(card);
-}
-
-function editTitle(input, filename) {
-    input.readOnly = false;
-    input.focus();
-    input.select();
-    
-    const saveBtn = document.createElement('button');
-    saveBtn.textContent = '✓';
-    saveBtn.className = 'save-title';
-    
-    const cancelBtn = document.createElement('button');
-    cancelBtn.textContent = '✗';
-    cancelBtn.className = 'cancel-title';
-    
-    const originalValue = input.value;
-    
-    saveBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        await saveTitle(filename, input.value);
-        cleanup();
-    });
-    
-    cancelBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        input.value = originalValue;
-        cleanup();
-    });
-    
-    function cleanup() {
-        input.readOnly = true;
-        if (saveBtn.parentNode) saveBtn.remove();
-        if (cancelBtn.parentNode) cancelBtn.remove();
-    }
-    
-    input.parentNode.appendChild(saveBtn);
-    input.parentNode.appendChild(cancelBtn);
-}
-
-async function saveTitle(filename, newTitle) {
-    try {
-        const response = await fetch('/api/update-title', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename, newTitle })
-        });
-        
-        if (response.ok) {
-            photoTitles[filename] = newTitle;
+    img.onload = function() {
+        const ratio = this.naturalWidth / this.naturalHeight;
+        if (ratio < 0.8) {
+            card.setAttribute('data-orientation', 'portrait');
+        } else if (ratio > 1.3) {
+            card.setAttribute('data-orientation', 'landscape');
         }
-    } catch (error) {
-        console.error('Error saving title:', error);
-    }
+    };
+    
+    card.appendChild(img);
+    card.addEventListener('click', () => openModal(photo));
+    elements.gallery.appendChild(card);
 }
 
-// Modal functions
 function openModal(photo) {
     currentPhoto = photo;
-    modalImg.src = photo.path;
-    modal.style.display = 'block';
+    elements.modalImg.src = photo.path;
+    elements.modal.style.display = 'block';
     
-    // Create new image element for EXIF reading
     const exifImg = new Image();
     exifImg.crossOrigin = "anonymous";
     
@@ -275,7 +221,7 @@ function openModal(photo) {
         displayBasicData(photo);
     };
     
-    exifImg.src = photo.path + '?t=' + Date.now(); // Cache bust
+    exifImg.src = photo.path + '?t=' + Date.now();
 }
 
 function extractExifData(img, photo) {
@@ -291,12 +237,9 @@ function extractExifData(img, photo) {
 }
 
 function displayPhotoData(photo, exifData) {
-    exifInfo.innerHTML = '';
-    
-    const title = photoTitles[photo.filename] || photo.name;
+    elements.exifInfo.innerHTML = '';
     
     const fields = {
-        'Title': title,
         'Camera': exifData.Make && exifData.Model ? `${exifData.Make} ${exifData.Model}` : 'Unknown',
         'Aperture': exifData.FNumber ? `f/${exifData.FNumber}` : 'N/A',
         'ISO': exifData.ISOSpeedRatings || 'N/A',
@@ -313,17 +256,14 @@ function displayPhotoData(photo, exifData) {
         const item = document.createElement('div');
         item.className = 'exif-item';
         item.innerHTML = `<strong>${key}:</strong> ${value}`;
-        exifInfo.appendChild(item);
+        elements.exifInfo.appendChild(item);
     });
 }
 
 function displayBasicData(photo) {
-    exifInfo.innerHTML = '';
-    
-    const title = photoTitles[photo.filename] || photo.name;
+    elements.exifInfo.innerHTML = '';
     
     const basicFields = {
-        'Title': title,
         'Filename': photo.name,
         'File Size': `${(photo.size / 1024 / 1024).toFixed(2)} MB`,
         'Date Modified': new Date(photo.lastModified).toLocaleString()
@@ -333,38 +273,6 @@ function displayBasicData(photo) {
         const item = document.createElement('div');
         item.className = 'exif-item';
         item.innerHTML = `<strong>${key}:</strong> ${value}`;
-        exifInfo.appendChild(item);
+        elements.exifInfo.appendChild(item);
     });
 }
-
-// Modal controls
-downloadBtn.addEventListener('click', function() {
-    if (currentPhoto) {
-        const link = document.createElement('a');
-        link.href = currentPhoto.path;
-        link.download = currentPhoto.name;
-        link.click();
-    }
-});
-
-closeModal.addEventListener('click', () => {
-    modal.style.display = 'none';
-});
-
-modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-        modal.style.display = 'none';
-    }
-});
-
-// Keyboard shortcuts
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        if (modal.style.display === 'block') {
-            modal.style.display = 'none';
-        }
-        if (adminPanel.style.display === 'block') {
-            closeAdminPanel();
-        }
-    }
-});
